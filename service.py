@@ -20,6 +20,7 @@ def only_chat_admin(func):
 
 
 def is_owner(func):
+    """Checking user for owner privileges"""
     async def wrapper(message: types.Message):
         if int(message.from_user.id) == cfg.ADMIN_ID:
             return await func(message)
@@ -42,10 +43,15 @@ async def mute_unmute_commands(permission: bool, message: types.Message, text_me
 
 
 async def restrict_user(chat_id: int, user_id: int, permission: bool, mute_time: int) -> None:
-    """Restrict User Permission to send Message on chat"""
+    """
+    Restrict User Permission to send Message on chat
+    """
     await cfg.bot.restrict_chat_member(
         chat_id=chat_id,
         user_id=user_id,
-        permissions={"can_send_messages": permission},
+        permissions={
+            "can_send_messages": permission,
+            "can_send_other_messages": permission,
+        },
         until_date=mute_time
     )
