@@ -1,7 +1,7 @@
 import asyncio
 from dotenv import load_dotenv
 import os
-
+from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram import Bot, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import Dispatcher
@@ -16,4 +16,5 @@ bot = Bot(TOKEN, parse_mode=types.ParseMode.HTML)
 dp = Dispatcher(bot, storage=MemoryStorage())
 
 
-BAD_WORDS: list = ["огурчик", "трактор", "бобр"]
+class Message_State(StatesGroup):
+    accept_user = State()

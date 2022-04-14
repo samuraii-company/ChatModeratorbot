@@ -1,18 +1,21 @@
 import db as database
 import config as cfg
 from aiogram import types
+from aiogram.utils import exceptions as ex
+
 
 db = database.Database()
 
 
-def is_admin(func):
+def only_chat_admin(func):
     """
     Checking user for admin privileges
     """
     async def wrapper(message: types.Message):
-        admins_list = await cfg.bot.get_chat_administrators(message.chat.id)
-        if int(message.from_user.id) in [x["user"]["id"] for x in admins_list]:
-            return await func(message)
+        if message.chat.type != "private":
+            admins_list = await cfg.bot.get_chat_administrators(message.chat.id)
+            if int(message.from_user.id) in [x["user"]["id"] for x in admins_list]:
+                return await func(message)
     return wrapper
 
 
@@ -21,3 +24,28 @@ def is_owner(func):
         if int(message.from_user.id) == cfg.ADMIN_ID:
             return await func(message)
     return wrapper
+
+
+async def mute_unmute_commands(permission: bool, message: types.Message, text_message: str, mute_time: int):
+    """Mute, Unmute Commands Callback"""
+    try:
+        await restrict_user(
+            chat_id=message.chat.id,
+            user_id=message.reply_to_message.from_user.id,
+            permission=permission,
+            mute_time=mute_time
+        )
+        await message.bot.delete_message(message.chat.id, message.message_id)
+        await message.reply_to_message.reply(text_message)
+    except (ex.CantRestrictSelf, ex.CantRestrictChatOwner, ex.UserIsAnAdministratorOfTheChat):
+        await message.answer("Невозможно выполнить эту команду для этого пользователя")
+
+
+async def restrict_user(chat_id: int, user_id: int, permission: bool, mute_time: int) -> None:
+    """Restrict User Permission to send Message on chat"""
+    await cfg.bot.restrict_chat_member(
+        chat_id=chat_id,
+        user_id=user_id,
+        permissions={"can_send_messages": permission},
+        until_date=mute_time
+    )
