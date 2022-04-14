@@ -117,6 +117,11 @@ async def words_filter(message: types.Message):
             break
 
 
+@cfg.dp.message_handler(content_types=["left_chat_member"])
+async def goodbuy_message(message: types.Message):
+    await cfg.bot.send_message(message.chat.id, "Прощай, нам будет тебя нехватать")
+
+
 @cfg.dp.message_handler(content_types=["new_chat_members"])
 async def new_chat_member(message: types.Message):
     """

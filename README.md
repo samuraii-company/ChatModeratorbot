@@ -4,7 +4,6 @@
 /allunmute +
 /mute +
 /unmute +
-/clearhistory
 
 
 
