@@ -12,17 +12,16 @@ def only_chat_admin(func):
     Checking user for admin privileges
     """
     async def wrapper(message: types.Message):
-        if message.chat.type != "private":
-            admins_list = await cfg.bot.get_chat_administrators(message.chat.id)
-            if int(message.from_user.id) in [x["user"]["id"] for x in admins_list]:
-                return await func(message)
+        admins_list = await cfg.bot.get_chat_administrators(message.chat.id)
+        if int(message.from_user.id) in [x["user"]["id"] for x in admins_list]:
+            return await func(message)
     return wrapper
 
 
 def is_owner(func):
     """Checking user for owner privileges"""
     async def wrapper(message: types.Message):
-        if int(message.from_user.id) == cfg.ADMIN_ID:
+        if int(message.from_user.id) == cfg.OWNER_ID:
             return await func(message)
     return wrapper
 
