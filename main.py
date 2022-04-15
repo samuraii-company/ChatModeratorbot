@@ -29,7 +29,7 @@ async def start_command(message: types.Message):
     if not await db.exists(message.from_user.id):
         await db.insert_one({
             "user_id": int(message.from_user.id),
-            "username": message.from_user.username
+            "username": message.from_user.username,
        })
     await cfg.bot.send_message(message.from_user.id, msg.start_message)
 
@@ -75,12 +75,41 @@ async def admin_command(message: types.Message):
 
 @cfg.dp.callback_query_handler(text="answer")
 async def answer_button(request: types.CallbackQuery):
+    """
+    Answer Button
+    """
     await request.message.edit_text("Введите id пользователя, которому вы  хотите ответить")
     await cfg.UserState.answer_id.set()
 
 
+@cfg.dp.callback_query_handler(text="spam")
+async def spam_button(request: types.CallbackQuery):
+    """
+    Spam Button
+    """
+    await request.message.answer(msg.spam_message)
+    await cfg.SpamState.spam.set()
+    
+
+@cfg.dp.message_handler(state=cfg.SpamState.spam, content_types=types.ContentTypes.ANY)
+async def create_spam(message: types.Message, state: FSMContext):
+    """
+    Create spam by all users
+    """
+    async for user in (user["user_id"] async for user in await db.get_all()):
+        try:
+            await message.copy_to(user)
+        except ex.BotBlocked:
+            await db.delete_one(user_id=user)
+    await message.answer("Рассылка завершена")
+    await state.finish()
+
+
 @cfg.dp.message_handler(state=cfg.UserState.answer_id, content_types='text')
 async def answer_id_callback(message: types.Message, state: FSMContext):
+    """
+    Answer id Callback
+    """
     if message.text.isnumeric():
         await state.update_data(answer_id=int(message.text))
         await message.answer("Введите ваш ответ на вопрос")
@@ -92,6 +121,9 @@ async def answer_id_callback(message: types.Message, state: FSMContext):
 
 @cfg.dp.message_handler(state=cfg.UserState.answer, content_types='text')
 async def answer_callback(message: types.Message, state: FSMContext):
+    """
+    Answer message Callback
+    """
     _answer_id = await state.get_data()
     await message.bot.send_message(_answer_id["answer_id"], message.text)
     await message.answer("Ответ успешно отправлен")

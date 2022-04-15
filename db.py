@@ -34,6 +34,6 @@ class Database:
             {'$set': {key: value}}
         )
 
-    async def delete(self, user_id: int) -> None:
+    async def delete_one(self, user_id: int) -> None:
         """Method delete userdata for once user from database"""
         await self.users.delete_one({"user_id": user_id})

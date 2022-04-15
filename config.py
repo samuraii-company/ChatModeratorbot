@@ -21,3 +21,7 @@ class UserState(StatesGroup):
     quastion = State()
     answer_id = State()
     answer = State()
+
+
+class SpamState(StatesGroup):
+    spam = State()
