@@ -76,11 +76,6 @@ async def get_rules(message: types.Message):
         await message.answer(rules["rules"])
 
 
-@cfg.dp.message_handler(commands="test")
-async def test(message):
-    admins_list = await cfg.bot.get_chat_administrators(message.chat.id)
-    print(admins_list)
-
 @cfg.dp.message_handler(group_chat=True, commands="setrules")
 @only_chat_admin
 async def set_rules_command(message: types.Message):
@@ -137,7 +132,10 @@ async def report_user(message: types.Message):
         await db.update_one(user_id=_user_id, key="reports", value=_report_count + 1)
         await message.answer("Ваша жалоба отправлена")
     else:
-        await message.answer(msg.reports_count_message)
+        admins_list = await cfg.bot.get_chat_administrators(message.chat.id)
+        admins = [f"@{x['user']['username']}" for x in admins_list if x["status"] == "administrator" and \
+        x["user"]["is_bot"] is False]
+        await message.answer(",".join(admins) + "\n" + msg.reports_count_message)
 
 
 @cfg.dp.message_handler(commands="donation", private_chat=True)
@@ -254,10 +252,10 @@ async def mute_user(message: types.Message):
         mute_time=int(time.time()) + 60 * 10
     )
         
-        
+
 @cfg.dp.message_handler(group_chat=True, commands="unmute")
 @only_chat_admin
-async def mute_user(message: types.Message):
+async def unmute_user(message: types.Message):
     """
     Command for mute user
     """
