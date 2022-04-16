@@ -76,6 +76,11 @@ async def get_rules(message: types.Message):
         await message.answer(rules["rules"])
 
 
+@cfg.dp.message_handler(commands="test")
+async def test(message):
+    admins_list = await cfg.bot.get_chat_administrators(message.chat.id)
+    print(admins_list)
+
 @cfg.dp.message_handler(group_chat=True, commands="setrules")
 @only_chat_admin
 async def set_rules_command(message: types.Message):
