@@ -11,6 +11,8 @@ load_dotenv()
 TOKEN: str = os.getenv("TOKEN")
 OWNER_ID: int = int(os.getenv("OWNER_ID"))
 
+MAX_REPORTS_COUNT = 3
+
 loop = asyncio.get_event_loop()
 bot = Bot(TOKEN, parse_mode=types.ParseMode.HTML)
 dp = Dispatcher(bot, storage=MemoryStorage())
@@ -25,3 +27,7 @@ class UserState(StatesGroup):
 
 class SpamState(StatesGroup):
     spam = State()
+
+
+class RuleState(StatesGroup):
+    rules = State()

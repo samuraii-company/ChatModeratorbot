@@ -13,3 +13,8 @@ admin_markup = InlineKeyboardMarkup(row_width=1).add(
 ).add(
     InlineKeyboardButton(text="Создать рассылку", callback_data="spam")
 )
+
+
+donation_markup = InlineKeyboardMarkup().add(
+    InlineKeyboardButton(text="На кофе", url="https://github.com/")
+)

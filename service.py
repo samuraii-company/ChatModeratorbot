@@ -1,10 +1,6 @@
-import db as database
 import config as cfg
 from aiogram import types
 from aiogram.utils import exceptions as ex
-
-
-db = database.Database()
 
 
 def only_chat_admin(func):
