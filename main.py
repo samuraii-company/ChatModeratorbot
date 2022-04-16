@@ -306,9 +306,11 @@ async def ban_user(message: types.Message):
         await message.answer("Эта команда должна быть ответом на сообщение")
         return
     try:
+        db = database.UserDatabase()
         await cfg.bot.ban_chat_member(chat_id=message.chat.id, user_id=message.reply_to_message.from_user.id)
         await message.bot.delete_message(message.chat.id, message.message_id)
         await message.reply_to_message.reply("Пользователь был забанен!!!")
+        await db.delete_one(user_id=message.reply_to_message.from_user.id)
     except (ex.CantRestrictSelf, ex.CantRestrictChatOwner, ex.UserIsAnAdministratorOfTheChat):
         await message.answer("Невозможно выполнить эту команду для этого пользователя")
 
@@ -385,6 +387,9 @@ async def accept_captcha(request: types.CallbackQuery, state: FSMContext):
         await db.insert_one({
             "user_id": request.from_user.id,
             "username": request.from_user.username,
+            "chat_id": request.message.chat.id,
+            "chat_title": request.message.chat.title,
+            "chat_username": request.message.chat.username,
             "reports": 0
        })
 
