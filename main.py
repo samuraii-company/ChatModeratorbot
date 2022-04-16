@@ -160,16 +160,13 @@ async def justify_user(message: types.Message):
         await message.answer("Эта команда должна быть ответом на сообщение")
         return
     db = database.UserDatabase()
-    _report_count = await db.report_count(user_id=message.reply_to_message.from_user.id)
-    if _report_count == 0:
-        await message.answer("За пользователем нет грехов")
-    else:
-        await db.update_one(
-            user_id=message.reply_to_message.from_user.id,
-            key="reports",
-            value=0
-        )
+    _user_id = message.reply_to_message.from_user.id
+    _report_count = await db.report_count(user_id=_user_id)
+    if _report_count != 0:
+        await db.update_one(user_id=_user_id, key="reports", value=0)
         await message.answer("Счетчик репортов сброшен")
+    else:
+        await message.answer("За пользователем нет грехов")
         
 
 @cfg.dp.message_handler(private_chat=True, commands="admin", content_types=["text"])
