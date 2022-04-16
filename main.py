@@ -126,13 +126,10 @@ async def report_user(message: types.Message):
         await message.answer("Эта команда должна быть ответом на сообщение")
         return
     db = database.UserDatabase()
-    _report_count = await db.report_count(user_id=message.reply_to_message.from_user.id)
+    _user_id = message.reply_to_message.from_user.id
+    _report_count = await db.report_count(user_id=_user_id)
     if not _report_count >= cfg.MAX_REPORTS_COUNT:
-        await db.update_one(
-            user_id=message.reply_to_message.from_user.id,
-            key="reports",
-            value=_report_count + 1
-        )
+        await db.update_one(user_id=_user_id, key="reports", value=_report_count + 1)
         await message.answer("Ваша жалоба отправлена")
     else:
         await message.answer(msg.reports_count_message)
@@ -378,7 +375,6 @@ async def accept_captcha(request: types.CallbackQuery, state: FSMContext):
         permission=True,
         mute_time=0
     )
-
     _username = request.from_user.username if request.from_user.username else "пользователя"
     await request.bot.send_message(request.message.chat.id, f"Поприветствуем {_username} в чате")
     db = database.UserDatabase()
