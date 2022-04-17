@@ -37,7 +37,7 @@ async def start_command(message: types.Message):
             "user_id": int(message.from_user.id),
             "username": message.from_user.username,
        })
-    await cfg.bot.send_message(message.from_user.id, msg.start_message)
+    await cfg.bot.send_message(message.from_user.id, msg.start_message, reply_markup=btn.instruciton_markup)
 
 
 @cfg.dp.message_handler(private_chat=True, commands="info")
