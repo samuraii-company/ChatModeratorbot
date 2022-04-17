@@ -7,12 +7,13 @@ from aiogram.utils import executor
 from aiogram.utils import exceptions as ex
 from aiogram.dispatcher import FSMContext
 
-from service import is_owner, only_chat_admin, mute_unmute_commands, restrict_user
+from service import is_owner, only_chat_admin, mute_unmute_commands, restrict_user, Statistics
 from banwords import BAN_WORDS
 from filters import PrivateChat, GroupChat
 import time
 import button as btn
 import messages as msg
+# from . import stat
 
 cfg.dp.filters_factory.bind(PrivateChat)
 cfg.dp.filters_factory.bind(GroupChat)
@@ -128,6 +129,7 @@ async def report_user(message: types.Message):
     db = database.UserDatabase()
     _user_id = message.reply_to_message.from_user.id
     _report_count = await db.report_count(user_id=_user_id)
+
     if not _report_count >= cfg.MAX_REPORTS_COUNT:
         await db.update_one(user_id=_user_id, key="reports", value=_report_count + 1)
         await message.answer("Ваша жалоба отправлена")
@@ -143,9 +145,9 @@ async def donation_command(message: types.Message):
     """
     Donation command
     """
-    await message.bot.send_message(
-        message.from_user.id,
-        "Поддержать разработчика",
+    await message.bot.send_animation(
+        chat_id=message.from_user.id,
+        animation=cfg.DONATION_GIF,
         reply_markup=btn.donation_markup
     )
 
@@ -236,6 +238,21 @@ async def answer_callback(message: types.Message, state: FSMContext):
     await state.finish()
 
 
+@cfg.dp.callback_query_handler(text="get_stat")
+async def get_statistics(request: types.CallbackQuery):
+    """
+    Forming Statistics about users
+    return csv file
+    """
+    await request.message.edit_text("Немножко подождите идет обработка ...")
+    db = database.UserDatabase()
+    _csv = Statistics()
+    await _csv.prepare((user async for user in await db.get_all()))
+    _file = await _csv.getfile()
+    await request.message.bot.send_document(request.from_user.id, _file)
+    await _csv.delete()
+
+
 @cfg.dp.message_handler(group_chat=True, commands="mute")
 @only_chat_admin
 async def mute_user(message: types.Message):
@@ -310,6 +327,7 @@ async def ban_user(message: types.Message):
         await cfg.bot.ban_chat_member(chat_id=message.chat.id, user_id=message.reply_to_message.from_user.id)
         await message.bot.delete_message(message.chat.id, message.message_id)
         await message.reply_to_message.reply("Пользователь был забанен!!!")
+    
         await db.delete_one(user_id=message.reply_to_message.from_user.id)
     except (ex.CantRestrictSelf, ex.CantRestrictChatOwner, ex.UserIsAnAdministratorOfTheChat):
         await message.answer("Невозможно выполнить эту команду для этого пользователя")

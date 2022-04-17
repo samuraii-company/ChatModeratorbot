@@ -12,6 +12,7 @@ TOKEN: str = os.getenv("TOKEN")
 OWNER_ID: int = int(os.getenv("OWNER_ID"))
 
 MAX_REPORTS_COUNT = 3
+DONATION_GIF = "https://c.tenor.com/F0V6OIf8F28AAAAd/port-city-port-city-international-university.gif"
 
 loop = asyncio.get_event_loop()
 bot = Bot(TOKEN, parse_mode=types.ParseMode.HTML)
