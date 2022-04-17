@@ -1,11 +1,6 @@
 import config as cfg
 from aiogram import types
 from aiogram.utils import exceptions as ex
-import csv
-import os
-from io import BytesIO
-from datetime import datetime
-from types import AsyncGeneratorType
 
 
 def only_chat_admin(func):
@@ -55,46 +50,3 @@ async def restrict_user(chat_id: int, user_id: int, permission: bool, mute_time:
         },
         until_date=mute_time
     )
-
-
-class Statistics:
-    """
-    Users List Excel
-    """
-    def __init__(self):
-        self.filename = f"Статистика{str(datetime.date)}"
-        self.row = ["ID", "Username", "Chat_id", "Chat_title", "Chat_username"]
-        
-    async def create(self) -> None:
-        with open(f"{self.filename}.csv", "w", encoding="utf-8") as f:
-            writter = csv.writer(f, delimiter=",", lineterminator="\r")
-            writter.writerow(self.row)
-        
-    async def append(self, user_row) -> None:
-        with open(f"{self.filename}.csv", "a") as f:
-            writter = csv.writer(f)
-            writter.writerow(
-                [
-                user_row["user_id"],
-                user_row["username"],
-                user_row["chat_id"],
-                user_row["chat_title"],
-                user_row["chat_username"],
-                ]
-            )
-
-    async def prepare(self, data: AsyncGeneratorType) -> None:
-        """
-        Preparing data for writing in file
-        """
-        await self.create()
-        [await self.append(row) async for row in data]
-
-    async def getfile(self) -> BytesIO:
-        with open(f"{self.filename}.csv", "rb") as f:
-            csv_file = BytesIO(f.read())
-            csv_file.name = f'{self.filename}.csv'
-            return csv_file
-        
-    async def delete(self) -> None:
-        os.remove(f"{self.filename}.csv")

@@ -7,13 +7,18 @@ from aiogram.utils import executor
 from aiogram.utils import exceptions as ex
 from aiogram.dispatcher import FSMContext
 
-from service import is_owner, only_chat_admin, mute_unmute_commands, restrict_user, Statistics
+from service import (
+    is_owner,
+    only_chat_admin,
+    mute_unmute_commands,
+    restrict_user
+)
+
 from banwords import BAN_WORDS
 from filters import PrivateChat, GroupChat
 import time
 import button as btn
 import messages as msg
-# from . import stat
 
 cfg.dp.filters_factory.bind(PrivateChat)
 cfg.dp.filters_factory.bind(GroupChat)
@@ -236,21 +241,6 @@ async def answer_callback(message: types.Message, state: FSMContext):
     await message.bot.send_message(_answer_id["answer_id"], message.text)
     await message.answer("Ответ успешно отправлен")
     await state.finish()
-
-
-@cfg.dp.callback_query_handler(text="get_stat")
-async def get_statistics(request: types.CallbackQuery):
-    """
-    Forming Statistics about users
-    return csv file
-    """
-    await request.message.edit_text("Немножко подождите идет обработка ...")
-    db = database.UserDatabase()
-    _csv = Statistics()
-    await _csv.prepare((user async for user in await db.get_all()))
-    _file = await _csv.getfile()
-    await request.message.bot.send_document(request.from_user.id, _file)
-    await _csv.delete()
 
 
 @cfg.dp.message_handler(group_chat=True, commands="mute")

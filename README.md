@@ -19,7 +19,7 @@ answer +
 spam + 
 
 
-/donation
+/donation 
 
 
 Проверка на бан ворды + 
