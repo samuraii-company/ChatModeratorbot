@@ -1,10 +1,12 @@
 from motor.motor_asyncio import AsyncIOMotorClient
+import config as cfg
 
 
 class UserDatabase:
     """Asyncio mongo database"""
     def __init__(self):
-        self.client = AsyncIOMotorClient('mongodb://localhost:27017')
+        self.client = AsyncIOMotorClient(f"mongodb://{cfg.db_username}:{cfg.db_password}@mongodb:27017")
+        # self.client = AsyncIOMotorClient("mongodb://localhost:27017")
         self.db = self.client["TelegramUsers"]
         self.users = self.db['chat_users']
 
@@ -58,7 +60,8 @@ class Rules:
     Chat Rules Database
     """
     def __init__(self):
-        self.client = AsyncIOMotorClient('mongodb://localhost:27017')
+        self.client = AsyncIOMotorClient(f"mongodb://{cfg.db_username}:{cfg.db_password}@mongodb:27017")
+        # self.client = AsyncIOMotorClient("mongodb://localhost:27017")
         self.db = self.client["TelegramUsers"]
         self.rules = self.db['rules']
         

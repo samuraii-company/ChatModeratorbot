@@ -1,7 +1,8 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+import config as cfg
 
 
-DONATION_URL = "https://inlnk.ru/KenDJa"
+DONATION_URL = cfg.DONATION_URL
 
 INSTRUCTION_URL = "https://telegra.ph/Instrukciya-dlya-bota-04-17"
 

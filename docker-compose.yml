@@ -1,0 +1,28 @@
+version: '3.3'
+services:
+
+    mongodb:
+        image: mongo:4.4
+        container_name: mongodb
+        restart: always
+        volumes:
+            - mongo_data:/var/lib/mongodata/data/
+        environment:
+            MONGO_INITDB_ROOT_USERNAME: ${db_username}
+            MONGO_INITDB_ROOT_PASSWORD: ${db_password}
+
+    bot:
+        image: bot
+        container_name: bot
+        volumes:
+            - .:/bot/
+        depends_on:
+            - mongodb
+        build:
+            context: .
+            dockerfile: Dockerfile
+        restart: always
+
+
+volumes:
+    mongo_data:

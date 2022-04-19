@@ -131,18 +131,30 @@ async def report_user(message: types.Message):
     if not message.reply_to_message:
         await message.answer("Эта команда должна быть ответом на сообщение")
         return
+
     db = database.UserDatabase()
     _user_id = message.reply_to_message.from_user.id
-    _report_count = await db.report_count(user_id=_user_id)
-
-    if not _report_count >= cfg.MAX_REPORTS_COUNT:
-        await db.update_one(user_id=_user_id, key="reports", value=_report_count + 1)
-        await message.answer("Ваша жалоба отправлена")
+    if await db.exists(user_id=_user_id):
+        _report_count = await db.report_count(user_id=_user_id)
+    
+        if not _report_count >= cfg.MAX_REPORTS_COUNT:
+            await db.update_one(user_id=_user_id, key="reports", value=_report_count + 1)
+            await message.answer("Ваша жалоба отправлена")
+        else:
+            admins_list = await cfg.bot.get_chat_administrators(message.chat.id)
+            admins = [f"@{x['user']['username']}" for x in admins_list if x["status"] == "administrator" and \
+            x["user"]["is_bot"] is False]
+            await message.answer(",".join(admins) + "\n" + msg.reports_count_message)
     else:
-        admins_list = await cfg.bot.get_chat_administrators(message.chat.id)
-        admins = [f"@{x['user']['username']}" for x in admins_list if x["status"] == "administrator" and \
-        x["user"]["is_bot"] is False]
-        await message.answer(",".join(admins) + "\n" + msg.reports_count_message)
+        await db.insert_one({
+            "user_id": message.reply_to_message.from_user.id,
+            "username": message.reply_to_message.from_user.username,
+            "chat_id": message.chat.id,
+            "chat_title": message.chat.title,
+            "chat_username": message.chat.username,
+            "reports": 1
+       })
+        await message.answer("Ваша жалоба отправлена")
 
 
 @cfg.dp.message_handler(commands="donation", private_chat=True)
