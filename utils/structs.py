@@ -12,7 +12,7 @@ class CollectionName:
 
 @dataclass
 class NewPrivateUserStruct:
-    """New User Info Struct"""
+    """New Private User Info Struct"""
 
     user_id: int
     username: str
@@ -20,6 +20,8 @@ class NewPrivateUserStruct:
 
 @dataclass
 class NewUserStruct:
+    """New User Info Struct"""
+   
     user_id: int
     username: str
     chat_id: int
