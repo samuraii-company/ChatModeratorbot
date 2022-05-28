@@ -1,5 +1,5 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-import config as cfg
+from config import config as cfg
 
 
 DONATION_URL = cfg.DONATION_URL
@@ -11,10 +11,10 @@ captcha_markup = InlineKeyboardMarkup().add(
 )
 
 
-admin_markup = InlineKeyboardMarkup(row_width=1).add(
-    InlineKeyboardButton(text="Ответить пользователю", callback_data="answer")
-).add(
-    InlineKeyboardButton(text="Создать рассылку", callback_data="spam")
+admin_markup = (
+    InlineKeyboardMarkup(row_width=1)
+    .add(InlineKeyboardButton(text="Ответить пользователю", callback_data="answer"))
+    .add(InlineKeyboardButton(text="Создать рассылку", callback_data="spam"))
 )
 
 

@@ -1,5 +1,6 @@
-import config as cfg
-import db as database
+from aiohttp import request
+from config import config as cfg
+from database.db import UserDatabase, Rules
 import logging
 
 from aiogram import types
@@ -7,18 +8,21 @@ from aiogram.utils import executor
 from aiogram.utils import exceptions as ex
 from aiogram.dispatcher import FSMContext
 
-from service import (
+from services.service import (
     is_owner,
     only_chat_admin,
-    mute_unmute_commands,
-    restrict_user
+    MuteChatFunction,
+    CaptchaFunction,
 )
 
-from banwords import BAN_WORDS
-from filters import PrivateChat, GroupChat
-import time
-import button as btn
-import messages as msg
+from utils.banwords import BAN_WORDS
+from utils.filters import PrivateChat, GroupChat
+from utils.exceptions import SomethingWentWrong
+from utils.structs import RulesInfo, NewUserStruct, NewPrivateUserStruct
+from utils.search import admin_search
+import assets.button as btn
+import assets.messages as msg
+
 
 cfg.dp.filters_factory.bind(PrivateChat)
 cfg.dp.filters_factory.bind(GroupChat)
@@ -31,13 +35,16 @@ async def start_command(message: types.Message):
     """
     Start Command
     """
-    db = database.PrivateUserDatabase()
+    db = await UserDatabase.init_private_db()
     if not await db.exists(message.from_user.id):
-        await db.insert_one({
-            "user_id": int(message.from_user.id),
-            "username": message.from_user.username,
-       })
-    await cfg.bot.send_message(message.from_user.id, msg.start_message, reply_markup=btn.instruciton_markup)
+        await db.insert_private_user(
+            NewPrivateUserStruct(
+                user_id=message.from_user.id, username=message.from_user.username
+            )
+        )
+    await cfg.bot.send_message(
+        message.from_user.id, msg.start_message, reply_markup=btn.instruciton_markup
+    )
 
 
 @cfg.dp.message_handler(private_chat=True, commands="info")
@@ -53,7 +60,10 @@ async def quastion_command(message: types.Message):
     """
     Quastion Command
     """
-    await cfg.bot.send_message(message.from_user.id, "Отправьте сообщение, которое вы хотите отправить администрации")
+    await cfg.bot.send_message(
+        message.from_user.id,
+        "Отправьте сообщение, которое вы хотите отправить администрации",
+    )
     await cfg.UserState.quastion.set()
 
 
@@ -64,22 +74,23 @@ async def quastion_callback(message: types.Message, state: FSMContext):
     """
     await message.forward(cfg.OWNER_ID)
     await message.answer("Сообщение успешно отправлено")
-    await message.bot.send_message(cfg.OWNER_ID, f"Сообщение от пользователя {message.from_user.id}")
-    
+    await message.bot.send_message(
+        cfg.OWNER_ID, f"Сообщение от пользователя {message.from_user.id}"
+    )
+
     await state.finish()
 
 
 @cfg.dp.message_handler(group_chat=True, commands="rules")
-async def get_rules(message: types.Message):
+async def get_rules(message: types.Message, db: Rules = Rules()):
     """
     Get Rules by chat command
     """
-    db = database.Rules()
     if not await db.exists(chat_id=message.chat.id):
         await message.answer("Для данного чата правила еще не установлены")
     else:
-        rules = await db.get_rules(chat_id=message.chat.id)
-        await message.answer(rules["rules"])
+        rules_info = await db.get_rules(chat_id=message.chat.id)
+        await message.answer(rules_info.rules)
 
 
 @cfg.dp.message_handler(group_chat=True, commands="setrules")
@@ -90,71 +101,41 @@ async def set_rules_command(message: types.Message):
     """
     await message.answer("Отправьте мне, список правил для данного чата")
     await cfg.RuleState.rules.set()
-    
+
 
 @cfg.dp.message_handler(state=cfg.RuleState.rules, content_types="text")
-async def set_rules_state(message: types.Message, state: FSMContext):
+async def set_rules_state(
+    message: types.Message, state: FSMContext, db: Rules = Rules()
+):
     """
     Set Rules by chat state
     """
-    db = database.Rules()
     if await db.exists(message.chat.id):
-        await message.answer("Правила для данной группы уже существуют,чтобы удалить /deleterules")
+        await message.answer(
+            "Правила для данной группы уже существуют,чтобы удалить /deleterules"
+        )
     else:
         try:
-            await db.set_rules(rules_data={"chat_id": message.chat.id, "rules": message.text})
+            await db.set_rules(
+                rules_data=RulesInfo(chat_id=message.chat.id, rules=message.text)
+            )
             await message.answer("Правила успешно записаны")
-        except Exception:
+        except SomethingWentWrong:
             await message.answer("Что-то пошло не так, попробуйте позже")
     await state.finish()
-    
-    
+
+
 @cfg.dp.message_handler(commands="deleterules", group_chat=True)
 @only_chat_admin
-async def delete_rules(message: types.Message):
+async def delete_rules(message: types.Message, db: Rules = Rules()):
     """
     Delete rules by chat
     """
-    db = database.Rules()
     if not await db.exists(message.chat.id):
         await message.answer("Правил для данной группы нет, чтобы создать /setrules")
     else:
         await db.delete_rules(chat_id=message.chat.id)
         await message.answer("Правила удалены")
-    
-
-@cfg.dp.message_handler(commands="report", group_chat=True)
-async def report_user(message: types.Message):
-    """
-    Report command
-    """
-    if not message.reply_to_message:
-        await message.answer("Эта команда должна быть ответом на сообщение")
-        return
-
-    db = database.UserDatabase()
-    _user_id = message.reply_to_message.from_user.id
-    if await db.exists(user_id=_user_id):
-        _report_count = await db.report_count(user_id=_user_id)
-    
-        if not _report_count >= cfg.MAX_REPORTS_COUNT:
-            await db.update_one(user_id=_user_id, key="reports", value=_report_count + 1)
-            await message.answer("Ваша жалоба отправлена")
-        else:
-            admins_list = await cfg.bot.get_chat_administrators(message.chat.id)
-            admins = [f"@{x['user']['username']}" for x in admins_list if x["status"] == "administrator" and \
-            x["user"]["is_bot"] is False]
-            await message.answer(",".join(admins) + "\n" + msg.reports_count_message)
-    else:
-        await db.insert_one({
-            "user_id": message.reply_to_message.from_user.id,
-            "username": message.reply_to_message.from_user.username,
-            "chat_id": message.chat.id,
-            "chat_title": message.chat.title,
-            "chat_username": message.chat.username,
-            "reports": 1
-       })
-        await message.answer("Ваша жалоба отправлена")
 
 
 @cfg.dp.message_handler(commands="donation", private_chat=True)
@@ -165,28 +146,9 @@ async def donation_command(message: types.Message):
     await message.bot.send_animation(
         chat_id=message.from_user.id,
         animation=cfg.DONATION_GIF,
-        reply_markup=btn.donation_markup
+        reply_markup=btn.donation_markup,
     )
 
-
-@cfg.dp.message_handler(commands="justify", group_chat=True)
-@only_chat_admin
-async def justify_user(message: types.Message):
-    """
-    Justify user command
-    """
-    if not message.reply_to_message:
-        await message.answer("Эта команда должна быть ответом на сообщение")
-        return
-    db = database.UserDatabase()
-    _user_id = message.reply_to_message.from_user.id
-    _report_count = await db.report_count(user_id=_user_id)
-    if _report_count != 0:
-        await db.update_one(user_id=_user_id, key="reports", value=0)
-        await message.answer("Счетчик репортов сброшен")
-    else:
-        await message.answer("За пользователем нет грехов")
-        
 
 @cfg.dp.message_handler(private_chat=True, commands="admin", content_types=["text"])
 @is_owner
@@ -194,7 +156,9 @@ async def admin_command(message: types.Message):
     """
     Admin Command
     """
-    await cfg.bot.send_message(message.from_user.id, "С возвращением сэр", reply_markup=btn.admin_markup)
+    await cfg.bot.send_message(
+        message.from_user.id, "С возвращением сэр", reply_markup=btn.admin_markup
+    )
 
 
 @cfg.dp.callback_query_handler(text="answer")
@@ -202,7 +166,9 @@ async def answer_button(request: types.CallbackQuery):
     """
     Answer Button
     """
-    await request.message.edit_text("Введите id пользователя, которому вы  хотите ответить")
+    await request.message.edit_text(
+        "Введите id пользователя, которому вы  хотите ответить"
+    )
     await cfg.UserState.answer_id.set()
 
 
@@ -213,24 +179,25 @@ async def spam_button(request: types.CallbackQuery):
     """
     await request.message.edit_text(msg.spam_message)
     await cfg.SpamState.spam.set()
-    
+
 
 @cfg.dp.message_handler(state=cfg.SpamState.spam, content_types=types.ContentTypes.ANY)
 async def create_spam(message: types.Message, state: FSMContext):
     """
     Create spam by all users
     """
-    db = database.PrivateUserDatabase()
-    async for user in (user["user_id"] async for user in await db.get_all()):
+    db = await UserDatabase.init_private_db()
+    async for user in (user.get("user_id") async for user in await db.get_all()):
         try:
             await message.copy_to(user)
         except ex.BotBlocked:
             await db.delete_one(user_id=user)
+
     await message.answer("Рассылка завершена")
     await state.finish()
 
 
-@cfg.dp.message_handler(state=cfg.UserState.answer_id, content_types='text')
+@cfg.dp.message_handler(state=cfg.UserState.answer_id, content_types="text")
 async def answer_id_callback(message: types.Message, state: FSMContext):
     """
     Answer id Callback
@@ -244,7 +211,7 @@ async def answer_id_callback(message: types.Message, state: FSMContext):
         await state.reset_state()
 
 
-@cfg.dp.message_handler(state=cfg.UserState.answer, content_types='text')
+@cfg.dp.message_handler(state=cfg.UserState.answer, content_types="text")
 async def answer_callback(message: types.Message, state: FSMContext):
     """
     Answer message Callback
@@ -264,13 +231,10 @@ async def mute_user(message: types.Message):
     if not message.reply_to_message:
         await message.answer("Эта команда должна быть ответом на сообщение")
         return
-    await mute_unmute_commands(
-        permission=False,
-        text_message="Пользователь был замучен на 10 минут!!!",
-        message=message,
-        mute_time=int(time.time()) + 60 * 10
-    )
-        
+
+    _mute_permissions = await MuteChatFunction.mute_init(message)
+    await _mute_permissions.apply()
+
 
 @cfg.dp.message_handler(group_chat=True, commands="unmute")
 @only_chat_admin
@@ -281,12 +245,9 @@ async def unmute_user(message: types.Message):
     if not message.reply_to_message:
         await message.answer("Эта команда должна быть ответом на сообщение")
         return
-    await mute_unmute_commands(
-        permission=True,
-        text_message="Пользователь был размучен",
-        message=message,
-        mute_time=0
-    )
+
+    _mute_permissions = await MuteChatFunction.unmute_init(message)
+    await _mute_permissions.apply()
 
 
 @cfg.dp.message_handler(group_chat=True, commands="allmute")
@@ -297,7 +258,7 @@ async def mute_all_user(message: types.Message):
     """
     await cfg.bot.set_chat_permissions(
         chat_id=message.chat.id,
-        permissions={"can_send_messages": False, "can_send_other_messages": False}
+        permissions={"can_send_messages": False, "can_send_other_messages": False},
     )
     await message.answer("Включен полный мут чата")
 
@@ -310,7 +271,7 @@ async def unmute_all_user(message: types.Message):
     """
     await cfg.bot.set_chat_permissions(
         chat_id=message.chat.id,
-        permissions={"can_send_messages": True, "can_send_other_messages": True}
+        permissions={"can_send_messages": True, "can_send_other_messages": True},
     )
     await message.answer("Полный мут чата выключен")
 
@@ -325,13 +286,19 @@ async def ban_user(message: types.Message):
         await message.answer("Эта команда должна быть ответом на сообщение")
         return
     try:
-        db = database.UserDatabase()
-        await cfg.bot.ban_chat_member(chat_id=message.chat.id, user_id=message.reply_to_message.from_user.id)
+        await cfg.bot.ban_chat_member(
+            chat_id=message.chat.id, user_id=message.reply_to_message.from_user.id
+        )
         await message.bot.delete_message(message.chat.id, message.message_id)
         await message.reply_to_message.reply("Пользователь был забанен!!!")
-    
+
+        db = await UserDatabase.init_users_db()
         await db.delete_one(user_id=message.reply_to_message.from_user.id)
-    except (ex.CantRestrictSelf, ex.CantRestrictChatOwner, ex.UserIsAnAdministratorOfTheChat):
+    except (
+        ex.CantRestrictSelf,
+        ex.CantRestrictChatOwner,
+        ex.UserIsAnAdministratorOfTheChat,
+    ):
         await message.answer("Невозможно выполнить эту команду для этого пользователя")
 
 
@@ -341,14 +308,25 @@ async def unban_user(message: types.Message):
     """
     Command for unban user
     """
-    admins_list = await cfg.bot.get_chat_administrators(message.chat.id)
+
+    admins_list = [
+        admin["user"]["id"]
+        for admin in await cfg.bot.get_chat_administrators(message.chat.id)
+    ]
+
     if not message.reply_to_message:
         await message.answer("Эта команда должна быть ответом на сообщение")
         return
-    if int(message.reply_to_message.from_user.id) in [x["user"]["id"] for x in admins_list]:
+
+    _status = await admin_search(
+        admins_list, int(message.reply_to_message.from_user.id)
+    )
+    if _status:
         await message.answer("Невозможно выполнить эту команду для этого пользователя")
     else:
-        await cfg.bot.unban_chat_member(chat_id=message.chat.id, user_id=message.reply_to_message.from_user.id)
+        await cfg.bot.unban_chat_member(
+            chat_id=message.chat.id, user_id=message.reply_to_message.from_user.id
+        )
         await message.bot.delete_message(message.chat.id, message.message_id)
         await message.reply_to_message.reply("Пользователь был разбанен!!!")
 
@@ -372,14 +350,10 @@ async def goodbuy_message(message: types.Message):
 @cfg.dp.message_handler(group_chat=True, content_types=["new_chat_members"])
 async def new_chat_member(message: types.Message):
     """
-    Welcoming new chat members
+    Welcome new chat members
     """
-    await restrict_user(
-        chat_id=message.chat.id,
-        user_id=message.from_user.id,
-        permission=False,
-        mute_time=int(time.time()) * 60 * 600
-    )
+    _captcha = await CaptchaFunction.init_captcha(message)
+    await _captcha.apply()
     await message.answer("Подтвердите, что вы человек", reply_markup=btn.captcha_markup)
     await cfg.UserState.accept_user.set()
 
@@ -391,27 +365,27 @@ async def accept_captcha(request: types.CallbackQuery, state: FSMContext):
     """
     await state.finish()
     await request.bot.delete_message(
-        request.message.chat.id,
-        request.message.message_id
+        request.message.chat.id, request.message.message_id
     )
-    await restrict_user(
-        chat_id=request.message.chat.id,
-        user_id=request.from_user.id,
-        permission=True,
-        mute_time=0
+    _captcha = await CaptchaFunction.accept_captcha(request)
+    await _captcha.apply()
+    _username = (
+        request.from_user.username if request.from_user.username else "пользователя"
     )
-    _username = request.from_user.username if request.from_user.username else "пользователя"
-    await request.bot.send_message(request.message.chat.id, f"Поприветствуем {_username} в чате")
-    db = database.UserDatabase()
+    await request.bot.send_message(
+        request.message.chat.id, f"Поприветствуем {_username} в чате"
+    )
+    db = await UserDatabase.init_users_db()
     if not await db.exists(request.from_user.id):
-        await db.insert_one({
-            "user_id": request.from_user.id,
-            "username": request.from_user.username,
-            "chat_id": request.message.chat.id,
-            "chat_title": request.message.chat.title,
-            "chat_username": request.message.chat.username,
-            "reports": 0
-       })
+        await db.insert_user(
+            NewUserStruct(
+                user_id=request.from_user.id,
+                username=request.from_user.username,
+                chat_id=request.message.chat.id,
+                chat_title=request.message.chat.title,
+                chat_username=request.message.chat.username,
+            )
+        )
 
 
 if __name__ == "__main__":
